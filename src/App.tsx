@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { Toolbar } from './components/Toolbar';
+import { RotateOverlay } from './components/RotateOverlay';
 import { StaffCanvas } from './components/StaffCanvas';
 import { BeatRuler } from './components/BeatRuler';
 import { MidiRollCanvas } from './components/MidiRollCanvas';
@@ -157,7 +158,8 @@ export default function App() {
   }, [undo, redo, togglePlayback, copySelection, pasteClipboard, toggleNoteGhost, toggleNoteAccent]);
 
   return (
-    <div className="relative flex flex-col h-screen overflow-hidden">
+    <div className="relative flex flex-col h-dvh min-h-screen overflow-hidden">
+      <RotateOverlay />
       {/* Rotating background — same as the main website */}
       <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true"
         style={{
@@ -173,11 +175,11 @@ export default function App() {
         }}
       />
       <Toolbar />
-      <div className="relative z-10 flex-1 flex flex-col justify-center overflow-hidden px-3 py-4 gap-2">
-        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] shrink-0" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)'}}>
+      <div className="relative z-10 flex-1 flex flex-col justify-center overflow-auto min-h-0 px-2 sm:px-3 py-2 sm:py-4 gap-2 mobile-landscape:py-1 mobile-landscape:gap-1">
+        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] shrink-0 mobile-landscape-staff" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)'}}>
           <StaffCanvas />
         </div>
-        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] flex flex-col shrink min-h-0" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)', maxHeight: '55vh'}}>
+        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] flex flex-col shrink min-h-0 mobile-landscape-roll" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)', maxHeight: 'min(55vh, 50%)'}}>
           <BeatRuler />
           <MidiRollCanvas />
         </div>

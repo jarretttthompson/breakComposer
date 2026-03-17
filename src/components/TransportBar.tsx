@@ -51,7 +51,7 @@ export function TransportBar() {
   const beatInMeasure = Math.floor(currentBeat % beatsPerMeasure) + 1;
 
   return (
-    <div className="relative z-10 flex items-center justify-center gap-4 px-4 py-2 border-t border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
+    <div className="relative z-10 flex-shrink-0 flex flex-nowrap items-center justify-center gap-2 sm:gap-4 px-2 sm:px-4 py-2 toolbar-safe-bottom toolbar-compact border-t border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm overflow-x-auto" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
       <button
         onClick={isPlaying ? stop : play}
         title={isPlaying ? 'Stop' : 'Play'}

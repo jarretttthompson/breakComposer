@@ -22,7 +22,7 @@ export function Toolbar() {
   const adjustZoom = useViewStore((s) => s.adjustZoom);
 
   return (
-    <div className="relative z-10 flex items-center gap-3 px-4 py-2 border-b border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
+    <div className="relative z-10 flex-shrink-0 flex flex-nowrap items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 toolbar-safe-top toolbar-compact border-b border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm overflow-x-auto" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
       <input
         type="text"
         value={title}
