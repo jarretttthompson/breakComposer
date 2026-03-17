@@ -1,0 +1,167 @@
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { useScoreStore } from '../store/scoreStore';
+import { useViewStore } from '../store/viewStore';
+import { ticksPerMeasure } from '../utils/tick';
+
+const RULER_HEIGHT = 24;
+const LABEL_WIDTH = 72;
+
+export function BeatRuler() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+
+  const score = useScoreStore((s) => s.score);
+  const scrollX = useViewStore((s) => s.scrollX);
+  const zoom = useViewStore((s) => s.zoom);
+  const setScrollX = useViewStore((s) => s.setScrollX);
+  const adjustZoom = useViewStore((s) => s.adjustZoom);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    ctx.fillStyle = '#131b2e';
+    ctx.fillRect(0, 0, rect.width, RULER_HEIGHT);
+
+    // Label area
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, LABEL_WIDTH, RULER_HEIGHT);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(LABEL_WIDTH, 0);
+    ctx.lineTo(LABEL_WIDTH, RULER_HEIGHT);
+    ctx.stroke();
+
+    const { measures, ppq } = score;
+    const gridTickSize = ppq / 8;
+    let measureStartTick = 0;
+
+    for (let mi = 0; mi < measures.length; mi++) {
+      const measure = measures[mi];
+      const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
+      const [beats, beatVal] = measure.timeSignature;
+
+      const measStartX = LABEL_WIDTH + (measureStartTick - scrollX) * zoom;
+      const measEndX = LABEL_WIDTH + (measureStartTick + measTicks - scrollX) * zoom;
+
+      if (measEndX < LABEL_WIDTH || measStartX > rect.width) {
+        measureStartTick += measTicks;
+        continue;
+      }
+
+      for (let beat = 0; beat < beats; beat++) {
+        const beatTick = measureStartTick + beat * ppq;
+        const beatX = LABEL_WIDTH + (beatTick - scrollX) * zoom;
+
+        if (beatX >= LABEL_WIDTH - 20 && beatX <= rect.width + 20) {
+          // Beat tick mark
+          const isBeat0 = beat === 0;
+          ctx.strokeStyle = isBeat0 ? '#e2e8f0' : '#64748b';
+          ctx.lineWidth = isBeat0 ? 1.5 : 1;
+          ctx.beginPath();
+          ctx.moveTo(beatX, isBeat0 ? 0 : RULER_HEIGHT * 0.4);
+          ctx.lineTo(beatX, RULER_HEIGHT);
+          ctx.stroke();
+
+          // Beat label
+          ctx.fillStyle = isBeat0 ? '#e2e8f0' : '#94a3b8';
+          ctx.font = isBeat0 ? '600 10px Inter, sans-serif' : '500 9px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          const label = isBeat0 ? `${mi + 1}` : `${beat + 1}`;
+          ctx.fillText(label, beatX + 3, 2);
+        }
+
+        // Subdivision ticks (eighth-note level only in ruler)
+        for (let sub = 1; sub < 8; sub++) {
+          const subTick = beatTick + sub * gridTickSize;
+          const x = LABEL_WIDTH + (subTick - scrollX) * zoom;
+          if (x < LABEL_WIDTH || x > rect.width) continue;
+
+          if (sub === 4) {
+            // Eighth-note subdivision
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x, RULER_HEIGHT * 0.6);
+            ctx.lineTo(x, RULER_HEIGHT);
+            ctx.stroke();
+          } else if (sub % 2 === 0) {
+            // Sixteenth subdivisions
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x, RULER_HEIGHT * 0.75);
+            ctx.lineTo(x, RULER_HEIGHT);
+            ctx.stroke();
+          }
+        }
+      }
+
+      measureStartTick += measTicks;
+    }
+
+    // Bottom border
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, RULER_HEIGHT - 0.5);
+    ctx.lineTo(rect.width, RULER_HEIGHT - 0.5);
+    ctx.stroke();
+  }, [score, scrollX, zoom]);
+
+  useEffect(() => {
+    let frameId = requestAnimationFrame(function loop() {
+      draw();
+      frameId = requestAnimationFrame(loop);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [draw]);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        adjustZoom(-e.deltaY * 0.0005);
+      } else {
+        setScrollX(scrollX + e.deltaX / zoom + e.deltaY / zoom);
+      }
+    },
+    [scrollX, zoom, adjustZoom, setScrollX]
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden"
+      style={{ height: RULER_HEIGHT }}
+      onWheel={handleWheel}
+    >
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full"
+      />
+    </div>
+  );
+}
