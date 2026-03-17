@@ -29,10 +29,10 @@ export function drawMidiRollLabels(
 ) {
   const { rowHeight, labelWidth, totalRows } = layout;
 
-  ctx.fillStyle = '#1e293b';
+  ctx.fillStyle = 'rgba(70, 35, 110, 0.7)';
   ctx.fillRect(0, 0, labelWidth, totalRows * rowHeight);
 
-  ctx.strokeStyle = '#334155';
+  ctx.strokeStyle = 'rgba(224, 111, 234, 0.3)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(labelWidth, 0);
@@ -45,7 +45,7 @@ export function drawMidiRollLabels(
     const y = i * rowHeight;
 
     if (i > 0) {
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = 'rgba(224, 111, 234, 0.2)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -53,8 +53,8 @@ export function drawMidiRollLabels(
       ctx.stroke();
     }
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = `600 11px Inter, sans-serif`;
+    ctx.fillStyle = 'rgba(240, 230, 250, 0.85)';
+    ctx.font = `600 11px 'Vulf Mono', 'Courier New', monospace`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText(config.shortLabel, labelWidth - 10, y + rowHeight / 2);
@@ -72,16 +72,19 @@ export function drawMidiRollGrid(
 ) {
   const { rowHeight, labelWidth, totalRows } = layout;
   const gridHeight = totalRows * rowHeight;
-  const gridTickSize = ppq / GRID_SUBDIVISIONS_PER_BEAT;
+  const thirtySecondTick = ppq / 8;
 
   ctx.clearRect(labelWidth, 0, canvasWidth - labelWidth, gridHeight);
 
-  // --- (C) Rhythmic-weight background shading ---
+  // Shading pass
   let shadeMeasStart = 0;
   for (let mi = 0; mi < measures.length; mi++) {
     const measure = measures[mi];
     const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
-    const [beats] = measure.timeSignature;
+    const [beats, beatVal] = measure.timeSignature;
+    const ticksPerBeat = ppq * (4 / beatVal);
+    const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
+    const halfBeat = Math.floor(subsPerBeat / 2);
     const measEndX = labelWidth + (shadeMeasStart + measTicks - scrollX) * zoom;
     const measStartX = labelWidth + (shadeMeasStart - scrollX) * zoom;
 
@@ -91,12 +94,12 @@ export function drawMidiRollGrid(
     }
 
     for (let beat = 0; beat < beats; beat++) {
-      const beatTick = shadeMeasStart + beat * ppq;
+      const beatTick = shadeMeasStart + beat * ticksPerBeat;
 
-      for (let sub = 0; sub < GRID_SUBDIVISIONS_PER_BEAT; sub++) {
-        const subTick = beatTick + sub * gridTickSize;
+      for (let sub = 0; sub < subsPerBeat; sub++) {
+        const subTick = beatTick + sub * thirtySecondTick;
         const colX = labelWidth + (subTick - scrollX) * zoom;
-        const colW = gridTickSize * zoom;
+        const colW = thirtySecondTick * zoom;
 
         if (colX + colW < labelWidth || colX > canvasWidth) continue;
 
@@ -106,13 +109,13 @@ export function drawMidiRollGrid(
 
         let shade: string;
         if (sub === 0) {
-          shade = 'rgba(59, 130, 246, 0.06)';      // quarter-note: strongest
-        } else if (sub === 4) {
-          shade = 'rgba(59, 130, 246, 0.035)';     // eighth-note
+          shade = 'rgba(224, 111, 234, 0.08)';
+        } else if (sub === halfBeat) {
+          shade = 'rgba(224, 111, 234, 0.05)';
         } else if (sub % 2 === 0) {
-          shade = 'rgba(59, 130, 246, 0.02)';      // sixteenth
+          shade = 'rgba(224, 111, 234, 0.03)';
         } else {
-          shade = 'rgba(0, 0, 0, 0)';               // 32nd: transparent
+          shade = 'rgba(0, 0, 0, 0)';
         }
 
         if (shade !== 'rgba(0, 0, 0, 0)') {
@@ -124,20 +127,23 @@ export function drawMidiRollGrid(
     shadeMeasStart += measTicks;
   }
 
-  // --- Row stripes (on top of shading) ---
+  // Row stripes
   for (let i = 0; i < totalRows; i++) {
     const y = i * rowHeight;
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(15, 23, 42, 0.55)' : 'rgba(20, 28, 46, 0.55)';
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(80, 40, 120, 0.55)' : 'rgba(90, 48, 135, 0.5)';
     ctx.fillRect(labelWidth, y, canvasWidth - labelWidth, rowHeight);
   }
 
-  // --- Grid lines ---
+  // Grid lines + barlines
   let measureStartTick = 0;
 
   for (let mi = 0; mi < measures.length; mi++) {
     const measure = measures[mi];
     const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
-    const [beats] = measure.timeSignature;
+    const [beats, beatVal] = measure.timeSignature;
+    const ticksPerBeat = ppq * (4 / beatVal);
+    const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
+    const halfBeat = Math.floor(subsPerBeat / 2);
 
     const measStartX2 = labelWidth + (measureStartTick - scrollX) * zoom;
     const measEndX2 = labelWidth + (measureStartTick + measTicks - scrollX) * zoom;
@@ -148,24 +154,24 @@ export function drawMidiRollGrid(
     }
 
     for (let beat = 0; beat < beats; beat++) {
-      const beatTick = measureStartTick + beat * ppq;
+      const beatTick = measureStartTick + beat * ticksPerBeat;
 
-      for (let sub = 0; sub < GRID_SUBDIVISIONS_PER_BEAT; sub++) {
+      for (let sub = 0; sub < subsPerBeat; sub++) {
         if (sub === 0) continue;
 
-        const subTick = beatTick + sub * gridTickSize;
+        const subTick = beatTick + sub * thirtySecondTick;
         const x = labelWidth + (subTick - scrollX) * zoom;
         if (x < labelWidth || x > canvasWidth) continue;
 
-        if (sub === 4) {
-          ctx.strokeStyle = '#3d4d63';
-          ctx.lineWidth = 0.5;
+        if (sub === halfBeat) {
+          ctx.strokeStyle = 'rgba(200, 160, 230, 0.35)';
+          ctx.lineWidth = 1;
         } else if (sub % 2 === 0) {
-          ctx.strokeStyle = '#2a3548';
-          ctx.lineWidth = 0.4;
+          ctx.strokeStyle = 'rgba(180, 140, 210, 0.25)';
+          ctx.lineWidth = 0.7;
         } else {
-          ctx.strokeStyle = '#1e2a3a';
-          ctx.lineWidth = 0.3;
+          ctx.strokeStyle = 'rgba(160, 120, 190, 0.18)';
+          ctx.lineWidth = 0.5;
         }
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -176,8 +182,8 @@ export function drawMidiRollGrid(
       if (beat > 0) {
         const beatX = labelWidth + (beatTick - scrollX) * zoom;
         if (beatX >= labelWidth && beatX <= canvasWidth) {
-          ctx.strokeStyle = '#4a5a72';
-          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = 'rgba(224, 111, 234, 0.35)';
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.moveTo(beatX, 0);
           ctx.lineTo(beatX, gridHeight);
@@ -186,17 +192,15 @@ export function drawMidiRollGrid(
       }
     }
 
-    // Barline
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = 'rgba(224, 111, 234, 0.6)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(measStartX2, 0);
     ctx.lineTo(measStartX2, gridHeight);
     ctx.stroke();
 
-    // Measure number
-    ctx.fillStyle = '#64748b';
-    ctx.font = '600 9px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(240, 230, 250, 0.8)';
+    ctx.font = "600 9px 'Vulf Mono', 'Courier New', monospace";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(String(mi + 1), measStartX2 + 4, 2);
@@ -204,10 +208,9 @@ export function drawMidiRollGrid(
     measureStartTick += measTicks;
   }
 
-  // Final barline
   const finalX = labelWidth + (measureStartTick - scrollX) * zoom;
   if (finalX >= labelWidth && finalX <= canvasWidth) {
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = 'rgba(224, 111, 234, 0.6)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(finalX, 0);
@@ -215,10 +218,9 @@ export function drawMidiRollGrid(
     ctx.stroke();
   }
 
-  // Row divider lines
   for (let i = 1; i < totalRows; i++) {
     const y = i * rowHeight;
-    ctx.strokeStyle = '#1e293b';
+    ctx.strokeStyle = 'rgba(224, 111, 234, 0.2)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(labelWidth, y);
@@ -227,7 +229,6 @@ export function drawMidiRollGrid(
   }
 }
 
-/** (B) Draw vertical alignment guides at every tick that has a note */
 export function drawAlignmentGuides(
   ctx: CanvasRenderingContext2D,
   measures: Measure[],
@@ -250,7 +251,7 @@ export function drawAlignmentGuides(
   }
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(147, 197, 253, 0.18)';
+  ctx.strokeStyle = 'rgba(0, 247, 255, 0.2)';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 4]);
 
@@ -282,6 +283,10 @@ export function drawMidiRollNotes(
 
   let measureStartTick = 0;
 
+  ctx.save();
+  ctx.shadowColor = 'rgba(224, 111, 234, 0.7)';
+  ctx.shadowBlur = 10;
+
   for (let mi = 0; mi < measures.length; mi++) {
     const measure = measures[mi];
     const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
@@ -296,20 +301,58 @@ export function drawMidiRollNotes(
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;
 
-      const alpha = 0.5 + (note.velocity / 127) * 0.5;
-      ctx.fillStyle = `rgba(59, 130, 246, ${alpha})`;
+      const alpha = 0.6 + (note.velocity / 127) * 0.4;
+
+      if (note.ghost) {
+        ctx.shadowColor = 'rgba(160, 128, 200, 0.4)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = `rgba(160, 128, 200, ${alpha * 0.5})`;
+      } else if (note.accent) {
+        ctx.shadowColor = 'rgba(0, 247, 255, 0.8)';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = `rgba(0, 247, 255, ${alpha})`;
+      } else {
+        ctx.shadowColor = 'rgba(224, 111, 234, 0.7)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = `rgba(224, 111, 234, ${alpha})`;
+      }
 
       const pad = 2;
       const drawX = Math.max(x + pad, labelWidth);
       const drawW = Math.min(cellWidth - pad * 2, canvasWidth - drawX);
-      ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), rowHeight - pad * 2);
+      const noteW = Math.max(drawW, 2);
+      const noteH = rowHeight - pad * 2;
+      const radius = 3;
 
-      ctx.fillStyle = `rgba(96, 165, 250, ${alpha})`;
-      ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), 2);
+      ctx.beginPath();
+      ctx.moveTo(drawX + radius, y + pad);
+      ctx.lineTo(drawX + noteW - radius, y + pad);
+      ctx.quadraticCurveTo(drawX + noteW, y + pad, drawX + noteW, y + pad + radius);
+      ctx.lineTo(drawX + noteW, y + pad + noteH - radius);
+      ctx.quadraticCurveTo(drawX + noteW, y + pad + noteH, drawX + noteW - radius, y + pad + noteH);
+      ctx.lineTo(drawX + radius, y + pad + noteH);
+      ctx.quadraticCurveTo(drawX, y + pad + noteH, drawX, y + pad + noteH - radius);
+      ctx.lineTo(drawX, y + pad + radius);
+      ctx.quadraticCurveTo(drawX, y + pad, drawX + radius, y + pad);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      if (note.accent) {
+        ctx.fillStyle = `rgba(130, 255, 255, ${alpha})`;
+      } else if (!note.ghost) {
+        ctx.fillStyle = `rgba(240, 154, 250, ${alpha})`;
+      } else {
+        ctx.fillStyle = `rgba(180, 160, 210, ${alpha * 0.4})`;
+      }
+      ctx.fillRect(drawX, y + pad, noteW, 2);
+      ctx.shadowBlur = 10;
     }
 
     measureStartTick += measTicks;
   }
+
+  ctx.restore();
 }
 
 export function drawPlayhead(
@@ -323,7 +366,7 @@ export function drawPlayhead(
   const x = labelWidth + (playheadTick - scrollX) * zoom;
   if (x < labelWidth) return;
 
-  ctx.strokeStyle = '#ef4444';
+  ctx.strokeStyle = '#ff3366';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(x, 0);
@@ -331,7 +374,6 @@ export function drawPlayhead(
   ctx.stroke();
 }
 
-/** Hit-test: given a canvas click, return the voice and tick */
 export function hitTestMidiRoll(
   canvasX: number,
   canvasY: number,
@@ -356,7 +398,6 @@ export function hitTestMidiRoll(
   return { voice, tick: snappedTick, row };
 }
 
-/** Convert canvas (x, y) to (tick, row) without snapping */
 export function canvasToTickRow(
   canvasX: number,
   canvasY: number,
@@ -372,7 +413,6 @@ export function canvasToTickRow(
   return { tick: snappedTick, row };
 }
 
-/** Draw a selection rectangle overlay */
 export function drawSelectionRect(
   ctx: CanvasRenderingContext2D,
   selection: SelectionRect,
@@ -388,7 +428,7 @@ export function drawSelectionRect(
   const minRow = Math.min(selection.startRow, selection.endRow);
   const maxRow = Math.max(selection.startRow, selection.endRow);
 
-  const gridTickSize = 60; // ppq / 8 = 480/8 = 60 (32nd note)
+  const gridTickSize = 60;
   const x1 = labelWidth + (minTick - scrollX) * zoom;
   const x2 = labelWidth + (maxTick + gridTickSize - scrollX) * zoom;
   const y1 = minRow * rowHeight;
@@ -398,17 +438,16 @@ export function drawSelectionRect(
   const drawX2 = Math.min(x2, canvasWidth);
   if (drawX2 <= drawX) return;
 
-  ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+  ctx.fillStyle = 'rgba(224, 111, 234, 0.12)';
   ctx.fillRect(drawX, y1, drawX2 - drawX, y2 - y1);
 
-  ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+  ctx.strokeStyle = 'rgba(224, 111, 234, 0.6)';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 2]);
   ctx.strokeRect(drawX, y1, drawX2 - drawX, y2 - y1);
   ctx.setLineDash([]);
 }
 
-/** Check whether a note (by absolute tick + voice row) falls inside the selection */
 export function isNoteInSelection(
   absTick: number,
   voiceRow: number,
@@ -436,7 +475,6 @@ export interface ResizeEdge {
 
 const RESIZE_HANDLE_PX = 8;
 
-/** Detect if a canvas position is on a resize edge/corner of the selection */
 export function getResizeEdge(
   canvasX: number,
   canvasY: number,
@@ -470,7 +508,6 @@ export function getResizeEdge(
   return { left: nearLeft, right: nearRight, top: nearTop, bottom: nearBottom };
 }
 
-/** Map a ResizeEdge to a CSS cursor value */
 export function getResizeCursor(edge: ResizeEdge): string {
   const { left, right, top, bottom } = edge;
   if ((top && left) || (bottom && right)) return 'nwse-resize';
@@ -480,7 +517,6 @@ export function getResizeCursor(edge: ResizeEdge): string {
   return 'default';
 }
 
-/** Check whether a (tick, row) position falls inside a normalized selection */
 export function isInsideSelection(
   tick: number,
   row: number,
@@ -493,7 +529,6 @@ export function isInsideSelection(
   return tick >= minTick && tick <= maxTick && row >= minRow && row <= maxRow;
 }
 
-/** Draw notes with optional selection highlighting and optional drag preview */
 export function drawMidiRollNotesWithSelection(
   ctx: CanvasRenderingContext2D,
   measures: Measure[],
@@ -511,6 +546,8 @@ export function drawMidiRollNotesWithSelection(
   const isMoving = dragDelta !== null && selection !== null;
 
   let measureStartTick = 0;
+
+  ctx.save();
 
   for (let mi = 0; mi < measures.length; mi++) {
     const measure = measures[mi];
@@ -530,40 +567,64 @@ export function drawMidiRollNotesWithSelection(
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;
 
-      const alpha = 0.5 + (note.velocity / 127) * 0.5;
+      const alpha = 0.6 + (note.velocity / 127) * 0.4;
       const isGhost = !!note.ghost;
       const isAccent = !!note.accent;
 
       let fillColor: string;
       let topColor: string;
       if (selected) {
-        fillColor = `rgba(250, 204, 21, ${alpha})`;
-        topColor = `rgba(253, 224, 71, ${alpha})`;
+        fillColor = `rgba(0, 247, 255, ${alpha})`;
+        topColor = `rgba(130, 255, 255, ${alpha})`;
+        ctx.shadowColor = 'rgba(0, 247, 255, 0.8)';
+        ctx.shadowBlur = 14;
       } else if (isGhost) {
-        fillColor = `rgba(148, 163, 184, ${alpha * 0.5})`;
-        topColor = `rgba(203, 213, 225, ${alpha * 0.6})`;
+        fillColor = `rgba(160, 128, 200, ${alpha * 0.45})`;
+        topColor = `rgba(180, 160, 210, ${alpha * 0.5})`;
+        ctx.shadowColor = 'rgba(160, 128, 200, 0.3)';
+        ctx.shadowBlur = 5;
       } else if (isAccent) {
-        fillColor = `rgba(249, 115, 22, ${alpha})`;
-        topColor = `rgba(251, 146, 60, ${alpha})`;
+        fillColor = `rgba(0, 247, 255, ${alpha})`;
+        topColor = `rgba(130, 255, 255, ${alpha})`;
+        ctx.shadowColor = 'rgba(0, 247, 255, 0.8)';
+        ctx.shadowBlur = 14;
       } else {
-        fillColor = `rgba(59, 130, 246, ${alpha})`;
-        topColor = `rgba(96, 165, 250, ${alpha})`;
+        fillColor = `rgba(224, 111, 234, ${alpha})`;
+        topColor = `rgba(240, 154, 250, ${alpha})`;
+        ctx.shadowColor = 'rgba(224, 111, 234, 0.7)';
+        ctx.shadowBlur = 10;
       }
 
       const pad = 2;
       const drawX = Math.max(x + pad, labelWidth);
       const drawW = Math.min(cellWidth - pad * 2, canvasWidth - drawX);
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), rowHeight - pad * 2);
+      const noteW = Math.max(drawW, 2);
+      const noteH = rowHeight - pad * 2;
+      const radius = 3;
 
+      ctx.fillStyle = fillColor;
+      ctx.beginPath();
+      ctx.moveTo(drawX + radius, y + pad);
+      ctx.lineTo(drawX + noteW - radius, y + pad);
+      ctx.quadraticCurveTo(drawX + noteW, y + pad, drawX + noteW, y + pad + radius);
+      ctx.lineTo(drawX + noteW, y + pad + noteH - radius);
+      ctx.quadraticCurveTo(drawX + noteW, y + pad + noteH, drawX + noteW - radius, y + pad + noteH);
+      ctx.lineTo(drawX + radius, y + pad + noteH);
+      ctx.quadraticCurveTo(drawX, y + pad + noteH, drawX, y + pad + noteH - radius);
+      ctx.lineTo(drawX, y + pad + radius);
+      ctx.quadraticCurveTo(drawX, y + pad, drawX + radius, y + pad);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
       ctx.fillStyle = topColor;
-      ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), 2);
+      ctx.fillRect(drawX, y + pad, noteW, 2);
 
       if (isGhost) {
-        ctx.strokeStyle = `rgba(148, 163, 184, 0.6)`;
+        ctx.strokeStyle = `rgba(160, 128, 200, 0.5)`;
         ctx.setLineDash([2, 2]);
         ctx.lineWidth = 1;
-        ctx.strokeRect(drawX, y + pad, Math.max(drawW, 2), rowHeight - pad * 2);
+        ctx.strokeRect(drawX, y + pad, noteW, noteH);
         ctx.setLineDash([]);
       }
     }
@@ -571,12 +632,13 @@ export function drawMidiRollNotesWithSelection(
     measureStartTick += measTicks;
   }
 
+  ctx.restore();
+
   if (isMoving && dragDelta) {
     drawDragGhosts(ctx, measures, ppq, scrollX, zoom, canvasWidth, layout, selection!, dragDelta);
   }
 }
 
-/** Draw translucent ghost notes at the drag-offset position */
 function drawDragGhosts(
   ctx: CanvasRenderingContext2D,
   measures: Measure[],
@@ -614,13 +676,13 @@ function drawDragGhosts(
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;
 
-      ctx.fillStyle = 'rgba(250, 204, 21, 0.45)';
+      ctx.fillStyle = 'rgba(0, 247, 255, 0.45)';
       const pad = 2;
       const drawX = Math.max(x + pad, labelWidth);
       const drawW = Math.min(cellWidth - pad * 2, canvasWidth - drawX);
       ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), rowHeight - pad * 2);
 
-      ctx.fillStyle = 'rgba(253, 224, 71, 0.6)';
+      ctx.fillStyle = 'rgba(100, 255, 255, 0.6)';
       ctx.fillRect(drawX, y + pad, Math.max(drawW, 2), 2);
     }
 

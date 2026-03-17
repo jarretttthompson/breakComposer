@@ -22,32 +22,32 @@ export function Toolbar() {
   const adjustZoom = useViewStore((s) => s.adjustZoom);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-[#334155] bg-[#1e293b]">
+    <div className="relative z-10 flex items-center gap-3 px-4 py-2 border-b border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="bg-transparent text-[#f1f5f9] font-semibold text-sm px-2 py-1 border border-transparent hover:border-[#475569] focus:border-[#3b82f6] rounded outline-none w-36"
+        className="bg-transparent text-[#f0e6f6] font-semibold text-sm px-2 py-1 border border-transparent hover:border-[#3d2a55] focus:border-[#e06fea] rounded outline-none w-36"
       />
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <div className="flex items-center gap-1.5">
-        <span className="text-[#94a3b8] text-xs">BPM</span>
+        <span className="text-[#a080b8] text-xs">BPM</span>
         <input
           type="number"
           value={tempo}
           onChange={(e) => setTempo(Number(e.target.value))}
           min={20}
           max={300}
-          className="bg-[#0f172a] text-[#f1f5f9] text-sm px-2 py-1 rounded border border-[#475569] focus:border-[#3b82f6] outline-none w-16 text-center"
+          className="bg-[#0a0612] text-[#f0e6f6] text-sm px-2 py-1 rounded border border-[#3d2a55] focus:border-[#e06fea] outline-none w-16 text-center"
         />
       </div>
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <div className="flex items-center gap-1.5">
-        <span className="text-[#94a3b8] text-xs">TS</span>
+        <span className="text-[#a080b8] text-xs">TS</span>
         <input
           type="number"
           value={timeSignature[0]}
@@ -56,15 +56,15 @@ export function Toolbar() {
           }
           min={1}
           max={32}
-          className="bg-[#0f172a] text-[#f1f5f9] text-sm px-2 py-1 rounded border border-[#475569] focus:border-[#3b82f6] outline-none w-12 text-center"
+          className="bg-[#0a0612] text-[#f0e6f6] text-sm px-2 py-1 rounded border border-[#3d2a55] focus:border-[#e06fea] outline-none w-12 text-center"
         />
-        <span className="text-[#94a3b8] text-xs">/</span>
+        <span className="text-[#a080b8] text-xs">/</span>
         <select
           value={timeSignature[1]}
           onChange={(e) =>
             setGlobalTimeSignature([timeSignature[0], Number(e.target.value)])
           }
-          className="bg-[#0f172a] text-[#f1f5f9] text-sm px-2 py-1 rounded border border-[#475569] focus:border-[#3b82f6] outline-none"
+          className="bg-[#0a0612] text-[#f0e6f6] text-sm px-2 py-1 rounded border border-[#3d2a55] focus:border-[#e06fea] outline-none"
         >
           <option value={2}>2</option>
           <option value={4}>4</option>
@@ -73,13 +73,13 @@ export function Toolbar() {
         </select>
       </div>
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <button
         onClick={undo}
         disabled={undoStack.length === 0}
         title="Undo (Ctrl+Z)"
-        className="px-2 py-1 rounded text-sm text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        className="px-2 py-1 rounded text-sm text-[#a080b8] hover:bg-[#2a1a3e] hover:text-[#f0e6f6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         ↩ Undo
       </button>
@@ -87,37 +87,38 @@ export function Toolbar() {
         onClick={redo}
         disabled={redoStack.length === 0}
         title="Redo (Ctrl+Shift+Z)"
-        className="px-2 py-1 rounded text-sm text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        className="px-2 py-1 rounded text-sm text-[#a080b8] hover:bg-[#2a1a3e] hover:text-[#f0e6f6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         ↪ Redo
       </button>
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <button
         onClick={() => addMeasure()}
         title="Add measure"
-        className="px-2 py-1 rounded text-sm text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9] transition-colors"
+        className="px-2 py-1 rounded text-sm text-[#a080b8] hover:bg-[#2a1a3e] hover:text-[#f0e6f6] transition-colors"
       >
         + Measure
       </button>
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <button
         onClick={clearAllNotes}
         title="Clear all notes"
-        className="px-2 py-1 rounded text-sm text-[#ef4444]/70 hover:bg-[#334155] hover:text-[#ef4444] transition-colors"
+        className="px-2 py-1 rounded text-sm text-[#ff3366]/70 hover:bg-[#2a1a3e] hover:text-[#ff3366] transition-colors"
       >
         Clear
       </button>
 
-      <div className="w-px h-6 bg-[#475569]" />
+      <div className="w-px h-6 bg-[#3d2a55]" />
 
       <button
         onClick={generateBreakbeatPattern}
         title="Generate a random breakbeat pattern"
-        className="px-2 py-1 rounded text-sm text-[#a78bfa]/80 hover:bg-[#334155] hover:text-[#a78bfa] transition-colors"
+        className="px-2 py-1 rounded text-sm text-[#00f7ff]/80 hover:bg-[#2a1a3e] hover:text-[#00f7ff] transition-colors"
+        style={{textShadow:'0 0 8px rgba(0,247,255,0.4)'}}
       >
         Breakbeat
       </button>
@@ -127,16 +128,16 @@ export function Toolbar() {
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => adjustZoom(-0.02)}
-          className="px-1.5 py-0.5 rounded text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9] text-sm transition-colors"
+          className="px-1.5 py-0.5 rounded text-[#a080b8] hover:bg-[#2a1a3e] hover:text-[#f0e6f6] text-sm transition-colors"
         >
           −
         </button>
-        <span className="text-[#94a3b8] text-xs w-12 text-center">
+        <span className="text-[#a080b8] text-xs w-12 text-center">
           {Math.round(zoom * 400)}%
         </span>
         <button
           onClick={() => adjustZoom(0.02)}
-          className="px-1.5 py-0.5 rounded text-[#94a3b8] hover:bg-[#334155] hover:text-[#f1f5f9] text-sm transition-colors"
+          className="px-1.5 py-0.5 rounded text-[#a080b8] hover:bg-[#2a1a3e] hover:text-[#f0e6f6] text-sm transition-colors"
         >
           +
         </button>

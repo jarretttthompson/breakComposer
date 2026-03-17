@@ -34,7 +34,7 @@ function makeCymbal(
 function initSynths() {
   if (initialized) return;
 
-  masterVol = new Tone.Volume(-6).toDestination();
+  masterVol = new Tone.Volume(-20).toDestination();
   const vol = masterVol;
 
   // Kick
@@ -242,4 +242,10 @@ export function stopPlayback() {
   loopStopped = true;
   Tone.getTransport().stop();
   Tone.getTransport().cancel();
+}
+
+export function setMasterVolume(db: number) {
+  if (masterVol) {
+    masterVol.volume.value = db;
+  }
 }

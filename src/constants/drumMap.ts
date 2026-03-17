@@ -26,7 +26,7 @@ export const DRUM_VOICES: DrumVoiceConfig[] = [
   { voice: 'rack-tom-2', label: 'Mid Tom',     shortLabel: 'T2', staffPosition: 5,  notehead: 'normal',   stemDirection: 'up',   midiNote: 47, vexKey: 'c/5',     vexNotehead: '' },
   { voice: 'snare',      label: 'Snare',       shortLabel: 'SN', staffPosition: 3,  notehead: 'normal',   stemDirection: 'up',   midiNote: 38, vexKey: 'c/5',     vexNotehead: '' },
   { voice: 'cross-stick',label: 'Cross Stick', shortLabel: 'XS', staffPosition: 3,  notehead: 'x',        stemDirection: 'up',   midiNote: 37, vexKey: 'c/5/x2',  vexNotehead: 'x2' },
-  { voice: 'floor-tom',  label: 'Floor Tom',   shortLabel: 'FT', staffPosition: 1,  notehead: 'normal',   stemDirection: 'down', midiNote: 43, vexKey: 'a/4',     vexNotehead: '' },
+  { voice: 'floor-tom',  label: 'Floor Tom',   shortLabel: 'FT', staffPosition: 1,  notehead: 'normal',   stemDirection: 'up',   midiNote: 43, vexKey: 'a/4',     vexNotehead: '' },
   { voice: 'kick',       label: 'Kick',        shortLabel: 'KD', staffPosition: -2, notehead: 'normal',   stemDirection: 'up',   midiNote: 36, vexKey: 'd/4',     vexNotehead: '' },
 ];
 

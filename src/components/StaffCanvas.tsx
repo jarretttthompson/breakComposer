@@ -60,22 +60,27 @@ export function StaffCanvas() {
       svg.prepend(styleEl);
     }
     styleEl.textContent = `
-      path, line, rect { stroke: #64748b; }
-      path[fill="black"], path[fill="#000"], path[fill="#000000"] { fill: #e2e8f0; }
-      text { fill: #e2e8f0 !important; }
+      path, line, rect { stroke: rgba(240, 230, 250, 0.9); }
+      path[fill="black"], path[fill="#000"], path[fill="#000000"],
+      rect[fill="black"], rect[fill="#000"], rect[fill="#000000"] {
+        fill: rgba(240, 230, 250, 0.9);
+        stroke: rgba(240, 230, 250, 0.9);
+      }
+      text { fill: rgba(240, 230, 250, 0.9) !important; }
     `;
+    svg.style.filter = 'drop-shadow(0 0 3px rgba(224, 111, 234, 0.4))';
 
-    // Also do a direct pass for any elements VexFlow sets inline
     svg.querySelectorAll('*').forEach((node) => {
       const el = node as SVGElement;
       const fill = el.getAttribute('fill');
       const stroke = el.getAttribute('stroke');
 
       if (fill === 'black' || fill === '#000' || fill === '#000000') {
-        el.setAttribute('fill', '#e2e8f0');
+        el.setAttribute('fill', 'rgba(240, 230, 250, 0.9)');
+        el.setAttribute('stroke', 'rgba(240, 230, 250, 0.9)');
       }
       if (stroke === 'black' || stroke === '#000' || stroke === '#000000') {
-        el.setAttribute('stroke', '#64748b');
+        el.setAttribute('stroke', 'rgba(240, 230, 250, 0.9)');
       }
     });
   }, [score, containerWidth, zoom]);
@@ -118,8 +123,8 @@ export function StaffCanvas() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden bg-[#0f172a]"
-      style={{ height: STAFF_CONTAINER_HEIGHT }}
+      className="relative w-full overflow-hidden"
+      style={{background: 'rgba(100, 52, 150, 0.54)', height: STAFF_CONTAINER_HEIGHT}}
       onWheel={handleWheel}
     >
       <div

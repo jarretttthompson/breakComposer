@@ -9,7 +9,7 @@ const LABEL_WIDTH = 72;
 export function BeatRuler() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
+  const [, setContainerWidth] = useState(800);
 
   const score = useScoreStore((s) => s.score);
   const scrollX = useViewStore((s) => s.scrollX);
@@ -40,13 +40,12 @@ export function BeatRuler() {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    ctx.fillStyle = '#131b2e';
+    ctx.fillStyle = 'rgba(80, 40, 120, 0.6)';
     ctx.fillRect(0, 0, rect.width, RULER_HEIGHT);
 
-    // Label area
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = 'rgba(70, 35, 110, 0.7)';
     ctx.fillRect(0, 0, LABEL_WIDTH, RULER_HEIGHT);
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = 'rgba(224, 111, 234, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(LABEL_WIDTH, 0);
@@ -54,13 +53,16 @@ export function BeatRuler() {
     ctx.stroke();
 
     const { measures, ppq } = score;
-    const gridTickSize = ppq / 8;
+    const thirtySecondTick = ppq / 8;
     let measureStartTick = 0;
 
     for (let mi = 0; mi < measures.length; mi++) {
       const measure = measures[mi];
       const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
       const [beats, beatVal] = measure.timeSignature;
+      const ticksPerBeat = ppq * (4 / beatVal);
+      const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
+      const halfBeat = Math.floor(subsPerBeat / 2);
 
       const measStartX = LABEL_WIDTH + (measureStartTick - scrollX) * zoom;
       const measEndX = LABEL_WIDTH + (measureStartTick + measTicks - scrollX) * zoom;
@@ -71,45 +73,40 @@ export function BeatRuler() {
       }
 
       for (let beat = 0; beat < beats; beat++) {
-        const beatTick = measureStartTick + beat * ppq;
+        const beatTick = measureStartTick + beat * ticksPerBeat;
         const beatX = LABEL_WIDTH + (beatTick - scrollX) * zoom;
 
         if (beatX >= LABEL_WIDTH - 20 && beatX <= rect.width + 20) {
-          // Beat tick mark
           const isBeat0 = beat === 0;
-          ctx.strokeStyle = isBeat0 ? '#e2e8f0' : '#64748b';
+          ctx.strokeStyle = isBeat0 ? 'rgba(224, 111, 234, 0.7)' : 'rgba(200, 160, 220, 0.5)';
           ctx.lineWidth = isBeat0 ? 1.5 : 1;
           ctx.beginPath();
           ctx.moveTo(beatX, isBeat0 ? 0 : RULER_HEIGHT * 0.4);
           ctx.lineTo(beatX, RULER_HEIGHT);
           ctx.stroke();
 
-          // Beat label
-          ctx.fillStyle = isBeat0 ? '#e2e8f0' : '#94a3b8';
-          ctx.font = isBeat0 ? '600 10px Inter, sans-serif' : '500 9px Inter, sans-serif';
+          ctx.fillStyle = isBeat0 ? 'rgba(240, 230, 250, 0.9)' : 'rgba(200, 180, 220, 0.7)';
+          ctx.font = isBeat0 ? "600 10px 'Vulf Mono', monospace" : "500 9px 'Vulf Mono', monospace";
           ctx.textAlign = 'left';
           ctx.textBaseline = 'top';
           const label = isBeat0 ? `${mi + 1}` : `${beat + 1}`;
           ctx.fillText(label, beatX + 3, 2);
         }
 
-        // Subdivision ticks (eighth-note level only in ruler)
-        for (let sub = 1; sub < 8; sub++) {
-          const subTick = beatTick + sub * gridTickSize;
+        for (let sub = 1; sub < subsPerBeat; sub++) {
+          const subTick = beatTick + sub * thirtySecondTick;
           const x = LABEL_WIDTH + (subTick - scrollX) * zoom;
           if (x < LABEL_WIDTH || x > rect.width) continue;
 
-          if (sub === 4) {
-            // Eighth-note subdivision
-            ctx.strokeStyle = '#475569';
+          if (sub === halfBeat) {
+            ctx.strokeStyle = 'rgba(180, 140, 210, 0.4)';
             ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(x, RULER_HEIGHT * 0.6);
             ctx.lineTo(x, RULER_HEIGHT);
             ctx.stroke();
           } else if (sub % 2 === 0) {
-            // Sixteenth subdivisions
-            ctx.strokeStyle = '#334155';
+            ctx.strokeStyle = 'rgba(160, 120, 190, 0.3)';
             ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(x, RULER_HEIGHT * 0.75);
@@ -122,8 +119,7 @@ export function BeatRuler() {
       measureStartTick += measTicks;
     }
 
-    // Bottom border
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = 'rgba(224, 111, 234, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, RULER_HEIGHT - 0.5);

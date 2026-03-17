@@ -104,7 +104,7 @@ export default function App() {
         e.preventDefault(); pasteClipboard();
       } else if (e.key === 'Escape') {
         useViewStore.getState().setSelection(null);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      } else if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'e') {
         const sel = useViewStore.getState().selection;
         if (sel) {
           e.preventDefault();
@@ -157,14 +157,28 @@ export default function App() {
   }, [undo, redo, togglePlayback, copySelection, pasteClipboard, toggleNoteGhost, toggleNoteAccent]);
 
   return (
-    <div className="flex flex-col h-screen bg-[#0f172a]">
+    <div className="relative flex flex-col h-screen overflow-hidden">
+      {/* Rotating background — same as the main website */}
+      <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true"
+        style={{
+          backgroundImage: 'url(/breakcomposer/background.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          width: '320vw', height: '320vh',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          animation: 'rotateBg 300s linear infinite',
+          filter: 'blur(5px)',
+          boxShadow: 'inset 0 0 180px 120px rgba(0,0,0,0.85)',
+        }}
+      />
       <Toolbar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b border-[#334155]">
+      <div className="relative z-10 flex-1 flex flex-col justify-center overflow-hidden px-3 py-4 gap-2">
+        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] shrink-0" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)'}}>
           <StaffCanvas />
         </div>
-        <BeatRuler />
-        <div className="flex-1 min-h-0">
+        <div className="rounded-lg overflow-hidden border border-[rgba(224,111,234,0.3)] flex flex-col shrink min-h-0" style={{boxShadow: '0 0 12px rgba(224,111,234,0.15)', maxHeight: '55vh'}}>
+          <BeatRuler />
           <MidiRollCanvas />
         </div>
       </div>

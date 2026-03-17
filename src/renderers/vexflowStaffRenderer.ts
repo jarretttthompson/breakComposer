@@ -16,13 +16,10 @@ import { spellVoiceRhythm, type RhythmEvent } from '../utils/rhythmSolver';
 import { ticksPerMeasure } from '../utils/tick';
 
 const STAVE_HEIGHT = 120;
-const TOP_MARGIN = 35;
-const ACCENT_Y = 6;
+const TOP_MARGIN = 42;
+const ACCENT_Y = 10;
 const STAFF_TIMELINE_LEFT = 72;
 const STAFF_RIGHT_PADDING = 20;
-const FIRST_MEASURE_DECORATION_SPACE = 72;
-const MIN_STAVE_WIDTH = 140;
-const MIN_PX_PER_EVENT = 22;
 
 export interface RenderResult {
   totalWidth: number;
@@ -155,25 +152,6 @@ function buildBeamsForVoice(
   return beams;
 }
 
-/**
- * Estimate the minimum stave width needed to avoid dense beamed groups
- * visually colliding with the next barline.
- */
-function estimateMinimumStaveWidth(measure: Measure, ppq: number, isFirst: boolean): number {
-  const measureTicks = ticksPerMeasure(measure.timeSignature, ppq);
-  const { up, down } = partitionNotes(measure.notes);
-  const upTicks = [...up.keys()].sort((a, b) => a - b);
-  const downTicks = [...down.keys()].sort((a, b) => a - b);
-  const upEvents = spellVoiceRhythm(upTicks, measureTicks);
-  const downEvents = spellVoiceRhythm(downTicks, measureTicks);
-  const eventColumns = Math.max(upEvents.length, downEvents.length, 1);
-  const densityWidth = eventColumns * MIN_PX_PER_EVENT + 24;
-  return Math.max(
-    MIN_STAVE_WIDTH,
-    densityWidth + (isFirst ? FIRST_MEASURE_DECORATION_SPACE : 0)
-  );
-}
-
 export function renderScore(
   container: HTMLDivElement,
   measures: Measure[],
@@ -193,18 +171,14 @@ export function renderScore(
   }
 
   const measureTickLengths = measures.map((m) => ticksPerMeasure(m.timeSignature, ppq));
-  const computedWidths = measures.map((measure, i) => {
-    const tickWidth = measureTickLengths[i] * zoom;
-    const minDensityWidth = estimateMinimumStaveWidth(measure, ppq, i === 0);
-    return Math.max(tickWidth, minDensityWidth);
-  });
+  const computedWidths = measureTickLengths.map((ticks) => ticks * zoom);
   const totalWidth = Math.max(
     containerWidth,
     STAFF_TIMELINE_LEFT + computedWidths.reduce((sum, w) => sum + w, 0) + STAFF_RIGHT_PADDING
   );
 
   const renderer = new Renderer(container, Renderer.Backends.SVG);
-  renderer.resize(totalWidth, STAVE_HEIGHT + TOP_MARGIN + 30);
+  renderer.resize(totalWidth, STAVE_HEIGHT + TOP_MARGIN + 20);
   const context = renderer.getContext();
 
   const staveXPositions: {
@@ -278,7 +252,7 @@ export function renderScore(
       .setMode(Voice.Mode.SOFT)
       .addTickables(downVoiceNotes);
 
-    const noteAreaWidth = Math.max(20, stave.getNoteEndX() - stave.getNoteStartX() - 10);
+    const noteAreaWidth = Math.max(20, stave.getNoteEndX() - stave.getNoteStartX() - 30);
     new Formatter()
       .joinVoices([upVoice])
       .joinVoices([downVoice])
@@ -303,15 +277,43 @@ export function renderScore(
     if (accentedNotes.length > 0) {
       const svg = container.querySelector('svg');
       if (svg) {
+        let defs = svg.querySelector('defs');
+        if (!defs) {
+          defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          svg.prepend(defs);
+        }
+        if (!defs.querySelector('#accentGlow')) {
+          const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+          filter.setAttribute('id', 'accentGlow');
+          filter.setAttribute('x', '-50%');
+          filter.setAttribute('y', '-50%');
+          filter.setAttribute('width', '200%');
+          filter.setAttribute('height', '200%');
+          const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+          blur.setAttribute('stdDeviation', '2');
+          blur.setAttribute('result', 'glow');
+          const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+          const m1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+          m1.setAttribute('in', 'glow');
+          const m2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+          m2.setAttribute('in', 'SourceGraphic');
+          merge.appendChild(m1);
+          merge.appendChild(m2);
+          filter.appendChild(blur);
+          filter.appendChild(merge);
+          defs.appendChild(filter);
+        }
+
         const accentY = ACCENT_Y;
         for (const note of accentedNotes) {
           const x = note.getAbsoluteX();
           const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
           g.setAttribute('transform', `translate(${x}, ${accentY})`);
+          g.setAttribute('filter', 'url(#accentGlow)');
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', 'M-7,-4 L7,0 L-7,4');
           path.setAttribute('fill', 'none');
-          path.setAttribute('stroke', 'black');
+          path.setAttribute('stroke', 'rgba(0, 247, 255, 0.9)');
           path.setAttribute('stroke-width', '2.5');
           path.setAttribute('stroke-linejoin', 'miter');
           g.appendChild(path);

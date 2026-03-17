@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useViewStore } from '../store/viewStore';
 import { useScoreStore } from '../store/scoreStore';
 import { tickToBeat } from '../utils/tick';
-import { startPlayback, stopPlayback } from '../audio/playbackEngine';
+import { startPlayback, stopPlayback, setMasterVolume } from '../audio/playbackEngine';
 
 export function TransportBar() {
   const isPlaying = useViewStore((s) => s.isPlaying);
@@ -12,7 +12,16 @@ export function TransportBar() {
   const looping = useViewStore((s) => s.looping);
   const toggleLooping = useViewStore((s) => s.toggleLooping);
 
+  const [volume, setVolume] = useState(50);
+
   const score = useScoreStore((s) => s.score);
+
+  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    setVolume(val);
+    const db = val === 0 ? -Infinity : -40 + (val / 100) * 40;
+    setMasterVolume(db);
+  }, []);
 
   const play = useCallback(async () => {
     setIsPlaying(true);
@@ -42,15 +51,16 @@ export function TransportBar() {
   const beatInMeasure = Math.floor(currentBeat % beatsPerMeasure) + 1;
 
   return (
-    <div className="flex items-center justify-center gap-4 px-4 py-2 border-t border-[#334155] bg-[#1e293b]">
+    <div className="relative z-10 flex items-center justify-center gap-4 px-4 py-2 border-t border-[#3d2a55] bg-[#1a0f28]/80 backdrop-blur-sm" style={{animation:'borderGlow 2s ease-in-out infinite'}}>
       <button
         onClick={isPlaying ? stop : play}
         title={isPlaying ? 'Stop' : 'Play'}
         className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
           isPlaying
-            ? 'bg-[#ef4444] text-white hover:bg-[#dc2626]'
-            : 'bg-[#3b82f6] text-white hover:bg-[#2563eb]'
+            ? 'bg-[#ff3366] text-white hover:bg-[#e0294f]'
+            : 'bg-[#e06fea] text-white hover:bg-[#c850d0]'
         }`}
+        style={{boxShadow: isPlaying ? '0 0 12px rgba(255,51,102,0.5)' : '0 0 12px rgba(224,111,234,0.4)'}}
       >
         {isPlaying ? (
           <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -68,8 +78,8 @@ export function TransportBar() {
         title={looping ? 'Disable loop' : 'Enable loop'}
         className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
           looping
-            ? 'bg-[#22c55e]/20 text-[#22c55e] ring-1 ring-[#22c55e]/40'
-            : 'text-[#64748b] hover:text-[#94a3b8] hover:bg-[#334155]'
+            ? 'bg-[#00f7ff]/20 text-[#00f7ff] ring-1 ring-[#00f7ff]/40'
+            : 'text-[#5a3a7a] hover:text-[#a080b8] hover:bg-[#2a1a3e]'
         }`}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -80,12 +90,48 @@ export function TransportBar() {
         </svg>
       </button>
 
-      <div className="text-[#94a3b8] text-sm font-mono min-w-[80px] text-center">
+      <div className="text-[#a080b8] text-sm font-mono min-w-[80px] text-center">
         {currentMeasure}.{beatInMeasure}
       </div>
 
-      <div className="text-[#64748b] text-xs">
+      <div className="text-[#5a3a7a] text-xs">
         {score.tempo} BPM &middot; {score.measures.length} measures
+      </div>
+
+      <div className="w-px h-6 bg-[#3d2a55]" />
+
+      <div className="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={volume === 0 ? '#5a3a7a' : '#a080b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4V5z" />
+          {volume > 0 && volume <= 50 && (
+            <path d="M15.54 8.46a5 5 0 010 7.07" />
+          )}
+          {volume > 50 && (
+            <>
+              <path d="M15.54 8.46a5 5 0 010 7.07" />
+              <path d="M19.07 4.93a10 10 0 010 14.14" />
+            </>
+          )}
+          {volume === 0 && (
+            <>
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </>
+          )}
+        </svg>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={volume}
+          onChange={handleVolumeChange}
+          title={`Volume: ${volume}%`}
+          className="w-20 h-1 appearance-none rounded-full cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, #e06fea ${volume}%, #3d2a55 ${volume}%)`,
+            accentColor: '#e06fea',
+          }}
+        />
       </div>
     </div>
   );

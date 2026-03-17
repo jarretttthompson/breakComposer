@@ -484,11 +484,11 @@ const MUTATIONS: Mutation[] = [
 // Tom fill generator (applied to the last measure or every Nth measure)
 // ---------------------------------------------------------------------------
 
-function generateTomFill(startPos: number): Hit[] {
+function generateTomFill(startPos: number, endPos: number = 16): Hit[] {
   const tomVoices: DrumVoice[] = ['rack-tom-1', 'rack-tom-2', 'floor-tom'];
   const fill: Hit[] = [];
   let voiceIdx = 0;
-  for (let p = startPos; p < 16; p++) {
+  for (let p = startPos; p < endPos; p++) {
     fill.push({ voice: tomVoices[voiceIdx], pos: p, accent: p === startPos });
     voiceIdx = Math.min(voiceIdx + 1, tomVoices.length - 1);
   }
@@ -538,25 +538,42 @@ export function generateBreakbeat(
     baseHits = shuffledMutations[i](baseHits);
   }
 
-  // Always linearize as a final pass to ensure no simultaneous hits
   baseHits = linearize(baseHits);
 
   const sixteenth = ppq / 4;
   const measTicks = ticksPerMeasure(timeSignature, ppq);
-  const maxPos = Math.floor(measTicks / sixteenth);
+  const maxPos = Math.round(measTicks / sixteenth);
+  const templateLen = 16;
 
   const fillBars = pickFillBars(bars, FILL_COUNT);
   const result: Note[][] = [];
 
   for (let m = 0; m < bars; m++) {
-    let measureHits: Hit[];
+    let expandedHits: Hit[];
 
-    if (fillBars.has(m)) {
-      const fillStart = randInt(12, 14);
-      const withoutTail = cloneHits(baseHits).filter((h) => h.pos < fillStart);
-      measureHits = [...withoutTail, ...generateTomFill(fillStart)];
+    if (maxPos <= templateLen) {
+      expandedHits = cloneHits(baseHits).filter((h) => h.pos < maxPos);
     } else {
-      measureHits = cloneHits(baseHits);
+      expandedHits = [];
+      const repetitions = Math.ceil(maxPos / templateLen);
+      for (let rep = 0; rep < repetitions; rep++) {
+        for (const h of baseHits) {
+          const newPos = h.pos + rep * templateLen;
+          if (newPos < maxPos) {
+            expandedHits.push({ ...h, pos: newPos });
+          }
+        }
+      }
+      expandedHits = linearize(expandedHits);
+    }
+
+    let measureHits: Hit[];
+    if (fillBars.has(m)) {
+      const fillStart = Math.max(maxPos - 4, Math.floor(maxPos * 0.75));
+      const withoutTail = expandedHits.filter((h) => h.pos < fillStart);
+      measureHits = [...withoutTail, ...generateTomFill(fillStart, maxPos)];
+    } else {
+      measureHits = expandedHits;
     }
 
     const notes: Note[] = measureHits

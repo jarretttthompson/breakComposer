@@ -173,6 +173,8 @@ export function MidiRollCanvas() {
     const y = e.clientY - rect.top;
     if (x < layout.labelWidth) return;
 
+    const isRightClick = e.button === 2;
+
     const { scrollX: sx, zoom: z } = getView();
     const pos = canvasToTickRow(x, y, sx, z, score.ppq, layout);
 
@@ -185,37 +187,43 @@ export function MidiRollCanvas() {
 
     const sel = getStoreSelection();
 
-    // 1. Resize edge of existing selection
-    if (sel) {
-      const edge = getResizeEdge(x, y, sel, sx, z, score.ppq, layout);
-      if (edge) {
-        modeRef.current = 'resizing';
-        resizeEdgeRef.current = edge;
-        resizeStartSelRef.current = { ...sel };
-        liveSelectionRef.current = { ...sel };
-        setCursor(getResizeCursor(edge));
+    if (!isRightClick) {
+      // Left-click: resize, move, copy, or single-note interactions
+
+      if (sel) {
+        const edge = getResizeEdge(x, y, sel, sx, z, score.ppq, layout);
+        if (edge) {
+          modeRef.current = 'resizing';
+          resizeEdgeRef.current = edge;
+          resizeStartSelRef.current = { ...sel };
+          liveSelectionRef.current = { ...sel };
+          setCursor(getResizeCursor(edge));
+          return;
+        }
+      }
+
+      if (sel && isInsideSelection(pos.tick, pos.row, sel)) {
+        const isCopy = e.metaKey || e.ctrlKey;
+        modeRef.current = isCopy ? 'copying' : 'moving';
+        setCursor('grabbing');
         return;
       }
-    }
 
-    // 2. Inside existing selection → move or copy
-    if (sel && isInsideSelection(pos.tick, pos.row, sel)) {
-      const isCopy = e.metaKey || e.ctrlKey;
-      modeRef.current = isCopy ? 'copying' : 'moving';
-      setCursor('grabbing');
-      return;
-    }
+      if (hasNoteAt(pos.tick, pos.row)) {
+        modeRef.current = 'pending-note';
+        return;
+      }
 
-    // 3. Click on existing note → prepare to move single note
-    if (hasNoteAt(pos.tick, pos.row)) {
-      modeRef.current = 'pending-note';
-      return;
+      // Left-click on empty = toggle note immediately (no drag-to-select)
+      setSelection(null);
+      showSelectionRectRef.current = false;
+      modeRef.current = 'pending-empty';
+    } else {
+      // Right-click: draw selection rectangle
+      setSelection(null);
+      showSelectionRectRef.current = false;
+      modeRef.current = 'pending-empty';
     }
-
-    // 4. Empty cell → prepare for selection drag or toggle click
-    setSelection(null);
-    showSelectionRectRef.current = false;
-    modeRef.current = 'pending-empty';
   }, [score.ppq, layout, setSelection]);
 
   // --- mousemove ---
@@ -239,7 +247,7 @@ export function MidiRollCanvas() {
 
     const mode = modeRef.current;
 
-    if (mode === 'pending-empty') {
+    if (mode === 'pending-empty' && e.buttons === 2) {
       modeRef.current = 'selecting';
       showSelectionRectRef.current = true;
     }
@@ -305,6 +313,7 @@ export function MidiRollCanvas() {
     } else if (mode === 'note-moving' && wasDragging && liveDragDeltaRef.current) {
       showSelectionRectRef.current = false;
       commitMove(liveDragDeltaRef.current, false);
+      setSelection(null);
 
     } else if (mode === 'copying' && wasDragging && liveDragDeltaRef.current) {
       commitMove(liveDragDeltaRef.current, true);
@@ -456,26 +465,49 @@ export function MidiRollCanvas() {
     }
   }, [adjustZoom, setScrollX]);
 
+  const totalTicks = score.measures.reduce(
+    (sum, m) => sum + ticksPerMeasure(m.timeSignature, score.ppq), 0
+  );
+
+  const handleScrollbar = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setScrollX(Number(e.target.value));
+  }, [setScrollX]);
+
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full overflow-hidden"
-      style={{ height: layout.totalHeight }}
-      onWheel={handleWheel}
-    >
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ cursor }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          if (modeRef.current === 'selecting' && isDraggingRef.current && liveSelectionRef.current) {
-            setSelection(liveSelectionRef.current);
-          }
-          resetRefs();
-          setCursor('crosshair');
+    <div className="flex flex-col flex-1 min-h-0">
+      <div
+        ref={containerRef}
+        className="relative w-full overflow-hidden shrink-0"
+        style={{ height: layout.totalHeight }}
+        onWheel={handleWheel}
+      >
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+          style={{ cursor }}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            if (modeRef.current === 'selecting' && isDraggingRef.current && liveSelectionRef.current) {
+              setSelection(liveSelectionRef.current);
+            }
+            resetRefs();
+            setCursor('crosshair');
+          }}
+        />
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={Math.max(0, totalTicks)}
+        value={Math.max(0, scrollX)}
+        onChange={handleScrollbar}
+        className="w-full h-2 appearance-none cursor-pointer"
+        style={{
+          background: `linear-gradient(to right, rgba(224,111,234,0.4) ${(scrollX / Math.max(1, totalTicks)) * 100}%, rgba(60,30,90,0.6) ${(scrollX / Math.max(1, totalTicks)) * 100}%)`,
+          borderRadius: 0,
         }}
       />
     </div>
