@@ -1,7 +1,10 @@
 import type { Measure, DrumVoice } from '../types';
 import { MIDI_ROLL_VOICES, VOICE_CONFIG_MAP } from '../constants/drumMap';
 import { ticksPerMeasure } from '../utils/tick';
+import { buildMeasureLayouts, tickToXFromLayouts } from '../utils/layout';
 import type { SelectionRect } from '../store/viewStore';
+
+
 
 const GRID_SUBDIVISIONS_PER_BEAT = 8; // 32nd notes
 
@@ -10,15 +13,64 @@ export interface MidiRollLayout {
   labelWidth: number;
   totalRows: number;
   totalHeight: number;
+  /** Convert absolute tick to pixel X, accounting for scroll */
+  tickToPx: (absTick: number, scrollX: number) => number;
+  /** Convert pixel X to absolute tick, accounting for scroll */
+  pxToTick: (canvasX: number, scrollX: number) => number;
 }
 
-export function getMidiRollLayout(rowHeight: number = 28): MidiRollLayout {
+export function getMidiRollLayout(
+  rowHeight: number = 28,
+  measures: Measure[] = [],
+  ppq: number = 480,
+  zoom: number = 0.25,
+  measureWidths: number[] = []
+): MidiRollLayout {
   const totalRows = MIDI_ROLL_VOICES.length;
+  const labelWidth = 72;
+
+  // Build per-measure layouts if widths are available
+  const hasLayouts = measureWidths.length > 0 && measureWidths.length === measures.length;
+  const layouts = hasLayouts ? buildMeasureLayouts(measures, measureWidths, ppq) : null;
+
+  const tickToPx = (absTick: number, scrollX: number): number => {
+    if (layouts) {
+      const absX = tickToXFromLayouts(absTick, layouts);
+      const scrollPx = tickToXFromLayouts(scrollX, layouts) - labelWidth;
+      return absX - scrollPx;
+    }
+    return labelWidth + (absTick - scrollX) * zoom;
+  };
+
+  const pxToTick = (canvasX: number, scrollX: number): number => {
+    if (layouts) {
+      // We need to convert canvasX to absolute X, then to tick
+      const scrollPx = tickToXFromLayouts(scrollX, layouts) - labelWidth;
+      const absX = canvasX + scrollPx;
+      // Find which measure this X falls in
+      for (const l of layouts) {
+        if (absX >= l.startX && absX <= l.startX + l.width) {
+          const fraction = (absX - l.startX) / l.width;
+          return l.tickStart + fraction * l.ticks;
+        }
+      }
+      // Beyond last measure
+      if (layouts.length > 0) {
+        const last = layouts[layouts.length - 1];
+        const fraction = (absX - last.startX) / last.width;
+        return last.tickStart + fraction * last.ticks;
+      }
+    }
+    return (canvasX - labelWidth) / zoom + scrollX;
+  };
+
   return {
     rowHeight,
-    labelWidth: 72,
+    labelWidth,
     totalRows,
     totalHeight: totalRows * rowHeight,
+    tickToPx,
+    pxToTick,
   };
 }
 
@@ -85,8 +137,8 @@ export function drawMidiRollGrid(
     const ticksPerBeat = ppq * (4 / beatVal);
     const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
     const halfBeat = Math.floor(subsPerBeat / 2);
-    const measEndX = labelWidth + (shadeMeasStart + measTicks - scrollX) * zoom;
-    const measStartX = labelWidth + (shadeMeasStart - scrollX) * zoom;
+    const measEndX = layout.tickToPx(shadeMeasStart + measTicks, scrollX);
+    const measStartX = layout.tickToPx(shadeMeasStart, scrollX);
 
     if (measEndX < labelWidth || measStartX > canvasWidth) {
       shadeMeasStart += measTicks;
@@ -98,7 +150,7 @@ export function drawMidiRollGrid(
 
       for (let sub = 0; sub < subsPerBeat; sub++) {
         const subTick = beatTick + sub * thirtySecondTick;
-        const colX = labelWidth + (subTick - scrollX) * zoom;
+        const colX = layout.tickToPx(subTick, scrollX);
         const colW = thirtySecondTick * zoom;
 
         if (colX + colW < labelWidth || colX > canvasWidth) continue;
@@ -145,8 +197,8 @@ export function drawMidiRollGrid(
     const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
     const halfBeat = Math.floor(subsPerBeat / 2);
 
-    const measStartX2 = labelWidth + (measureStartTick - scrollX) * zoom;
-    const measEndX2 = labelWidth + (measureStartTick + measTicks - scrollX) * zoom;
+    const measStartX2 = layout.tickToPx(measureStartTick, scrollX);
+    const measEndX2 = layout.tickToPx(measureStartTick + measTicks, scrollX);
 
     if (measEndX2 < labelWidth || measStartX2 > canvasWidth) {
       measureStartTick += measTicks;
@@ -160,7 +212,7 @@ export function drawMidiRollGrid(
         if (sub === 0) continue;
 
         const subTick = beatTick + sub * thirtySecondTick;
-        const x = labelWidth + (subTick - scrollX) * zoom;
+        const x = layout.tickToPx(subTick, scrollX);
         if (x < labelWidth || x > canvasWidth) continue;
 
         if (sub === halfBeat) {
@@ -180,7 +232,7 @@ export function drawMidiRollGrid(
       }
 
       if (beat > 0) {
-        const beatX = labelWidth + (beatTick - scrollX) * zoom;
+        const beatX = layout.tickToPx(beatTick, scrollX);
         if (beatX >= labelWidth && beatX <= canvasWidth) {
           ctx.strokeStyle = 'rgba(224, 111, 234, 0.35)';
           ctx.lineWidth = 1.2;
@@ -208,7 +260,7 @@ export function drawMidiRollGrid(
     measureStartTick += measTicks;
   }
 
-  const finalX = labelWidth + (measureStartTick - scrollX) * zoom;
+  const finalX = layout.tickToPx(measureStartTick, scrollX);
   if (finalX >= labelWidth && finalX <= canvasWidth) {
     ctx.strokeStyle = 'rgba(224, 111, 234, 0.6)';
     ctx.lineWidth = 2;
@@ -234,7 +286,7 @@ export function drawAlignmentGuides(
   measures: Measure[],
   ppq: number,
   scrollX: number,
-  zoom: number,
+  _zoom: number,
   canvasWidth: number,
   layout: MidiRollLayout
 ) {
@@ -256,7 +308,7 @@ export function drawAlignmentGuides(
   ctx.setLineDash([3, 4]);
 
   for (const absTick of noteTickSet) {
-    const x = labelWidth + (absTick - scrollX) * zoom;
+    const x = layout.tickToPx(absTick, scrollX);
     if (x < labelWidth || x > canvasWidth) continue;
 
     ctx.beginPath();
@@ -296,7 +348,7 @@ export function drawMidiRollNotes(
       if (voiceIdx === -1) continue;
 
       const absTick = measureStartTick + note.tick;
-      const x = labelWidth + (absTick - scrollX) * zoom;
+      const x = layout.tickToPx(absTick, scrollX);
       const y = voiceIdx * rowHeight;
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;
@@ -359,12 +411,12 @@ export function drawPlayhead(
   ctx: CanvasRenderingContext2D,
   playheadTick: number,
   scrollX: number,
-  zoom: number,
-  labelWidth: number,
+  _zoom: number,
+  layout: MidiRollLayout,
   height: number
 ) {
-  const x = labelWidth + (playheadTick - scrollX) * zoom;
-  if (x < labelWidth) return;
+  const x = layout.tickToPx(playheadTick, scrollX);
+  if (x < layout.labelWidth) return;
 
   ctx.strokeStyle = '#ff3366';
   ctx.lineWidth = 2;
@@ -378,7 +430,7 @@ export function hitTestMidiRoll(
   canvasX: number,
   canvasY: number,
   scrollX: number,
-  zoom: number,
+  _zoom: number,
   ppq: number,
   layout: MidiRollLayout
 ): { voice: DrumVoice; tick: number; row: number } | null {
@@ -392,7 +444,7 @@ export function hitTestMidiRoll(
   const voice = MIDI_ROLL_VOICES[row];
   const gridTickSize = ppq / GRID_SUBDIVISIONS_PER_BEAT;
 
-  const rawTick = (canvasX - labelWidth) / zoom + scrollX;
+  const rawTick = layout.pxToTick(canvasX, scrollX);
   const snappedTick = Math.floor(rawTick / gridTickSize) * gridTickSize;
 
   return { voice, tick: snappedTick, row };
@@ -402,12 +454,12 @@ export function canvasToTickRow(
   canvasX: number,
   canvasY: number,
   scrollX: number,
-  zoom: number,
+  _zoom: number,
   ppq: number,
   layout: MidiRollLayout
 ): { tick: number; row: number } {
   const gridTickSize = ppq / GRID_SUBDIVISIONS_PER_BEAT;
-  const rawTick = (canvasX - layout.labelWidth) / zoom + scrollX;
+  const rawTick = layout.pxToTick(canvasX, scrollX);
   const snappedTick = Math.floor(rawTick / gridTickSize) * gridTickSize;
   const row = Math.floor(canvasY / layout.rowHeight);
   return { tick: snappedTick, row };
@@ -417,7 +469,7 @@ export function drawSelectionRect(
   ctx: CanvasRenderingContext2D,
   selection: SelectionRect,
   scrollX: number,
-  zoom: number,
+  _zoom: number,
   layout: MidiRollLayout,
   canvasWidth: number
 ) {
@@ -429,8 +481,8 @@ export function drawSelectionRect(
   const maxRow = Math.max(selection.startRow, selection.endRow);
 
   const gridTickSize = 60;
-  const x1 = labelWidth + (minTick - scrollX) * zoom;
-  const x2 = labelWidth + (maxTick + gridTickSize - scrollX) * zoom;
+  const x1 = layout.tickToPx(minTick, scrollX);
+  const x2 = layout.tickToPx(maxTick + gridTickSize, scrollX);
   const y1 = minRow * rowHeight;
   const y2 = (maxRow + 1) * rowHeight;
 
@@ -480,7 +532,7 @@ export function getResizeEdge(
   canvasY: number,
   selection: SelectionRect,
   scrollX: number,
-  zoom: number,
+  _zoom: number,
   ppq: number,
   layout: MidiRollLayout
 ): ResizeEdge | null {
@@ -490,8 +542,8 @@ export function getResizeEdge(
   const minRow = Math.min(selection.startRow, selection.endRow);
   const maxRow = Math.max(selection.startRow, selection.endRow);
 
-  const leftX = layout.labelWidth + (minTick - scrollX) * zoom;
-  const rightX = layout.labelWidth + (maxTick + gridTickSize - scrollX) * zoom;
+  const leftX = layout.tickToPx(minTick, scrollX);
+  const rightX = layout.tickToPx(maxTick + gridTickSize, scrollX);
   const topY = minRow * layout.rowHeight;
   const bottomY = (maxRow + 1) * layout.rowHeight;
 
@@ -562,7 +614,7 @@ export function drawMidiRollNotesWithSelection(
 
       if (isMoving && selected) continue;
 
-      const x = labelWidth + (absTick - scrollX) * zoom;
+      const x = layout.tickToPx(absTick, scrollX);
       const y = voiceIdx * rowHeight;
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;
@@ -671,7 +723,7 @@ function drawDragGhosts(
       const newRow = voiceIdx + delta.rowDelta;
       if (newRow < 0 || newRow >= totalRows) continue;
 
-      const x = labelWidth + (newTick - scrollX) * zoom;
+      const x = layout.tickToPx(newTick, scrollX);
       const y = newRow * rowHeight;
 
       if (x + cellWidth < labelWidth || x > canvasWidth) continue;

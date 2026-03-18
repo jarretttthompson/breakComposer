@@ -80,8 +80,9 @@ export function MidiRollCanvas() {
   const adjustZoom = useViewStore((s) => s.adjustZoom);
   const selection = useViewStore((s) => s.selection);
   const setSelection = useViewStore((s) => s.setSelection);
+  const measureWidths = useViewStore((s) => s.measureWidths);
 
-  const layout = getMidiRollLayout(28);
+  const layout = getMidiRollLayout(28, score.measures, score.ppq, zoom, measureWidths);
 
   // --- draw loop ---
   const draw = useCallback(() => {
@@ -122,11 +123,11 @@ export function MidiRollCanvas() {
     }
 
     if (isPlaying) {
-      drawPlayhead(ctx, playheadTick, scrollX, zoom, layout.labelWidth, layout.totalHeight);
+      drawPlayhead(ctx, playheadTick, scrollX, zoom, layout, layout.totalHeight);
     }
 
     drawMidiRollLabels(ctx, layout, dpr);
-  }, [score, scrollX, zoom, isPlaying, playheadTick, layout, selection]);
+  }, [score, scrollX, zoom, isPlaying, playheadTick, layout, selection, measureWidths]);
 
   useEffect(() => {
     if (!isPlaying) return;

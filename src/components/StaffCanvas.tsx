@@ -18,6 +18,7 @@ export function StaffCanvas() {
   const zoom = useViewStore((s) => s.zoom);
   const setScrollX = useViewStore((s) => s.setScrollX);
   const adjustZoom = useViewStore((s) => s.adjustZoom);
+  const setMeasureWidths = useViewStore((s) => s.setMeasureWidths);
 
   const [containerWidth, setContainerWidth] = useState(800);
 
@@ -41,6 +42,7 @@ export function StaffCanvas() {
     try {
       const result = renderScore(el, score.measures, score.ppq, containerWidth, zoom);
       renderResultRef.current = result;
+      setMeasureWidths(result.measureWidths);
     } catch (e) {
       console.warn('VexFlow render error:', e);
       return;
@@ -61,10 +63,8 @@ export function StaffCanvas() {
     }
     styleEl.textContent = `
       path, line, rect { stroke: rgba(240, 230, 250, 0.9); }
-      path[fill="black"], path[fill="#000"], path[fill="#000000"],
-      rect[fill="black"], rect[fill="#000"], rect[fill="#000000"] {
+      path:not([fill="none"]), rect:not([fill="none"]) {
         fill: rgba(240, 230, 250, 0.9);
-        stroke: rgba(240, 230, 250, 0.9);
       }
       text { fill: rgba(240, 230, 250, 0.9) !important; }
     `;

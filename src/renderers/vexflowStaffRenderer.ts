@@ -26,6 +26,7 @@ export interface RenderResult {
   staveYTop: number;
   staveYBottom: number;
   tickToX: (absoluteTick: number) => number;
+  measureWidths: number[];
 }
 
 /**
@@ -167,11 +168,86 @@ export function renderScore(
       staveYTop: TOP_MARGIN,
       staveYBottom: TOP_MARGIN + STAVE_HEIGHT,
       tickToX: () => 0,
+      measureWidths: [],
     };
   }
 
   const measureTickLengths = measures.map((m) => ticksPerMeasure(m.timeSignature, ppq));
-  const computedWidths = measureTickLengths.map((ticks) => ticks * zoom);
+  const baseWidths = measureTickLengths.map((ticks) => ticks * zoom);
+
+  // --- Two-pass approach ---
+  // Pass 1: For each measure, build VexFlow voices off-screen to find
+  //         the minimum width the Formatter needs. Use the larger of
+  //         (ticks * zoom) and (VexFlow minimum + padding).
+  //         Also measure the clef/time-sig overhead for measure 0.
+  let clefTimeSigWidth = 0;
+  const computedWidths = baseWidths.slice();
+
+  {
+    const tmpDiv = document.createElement('div');
+    tmpDiv.style.position = 'absolute';
+    tmpDiv.style.left = '-9999px';
+    document.body.appendChild(tmpDiv);
+    const tmpRenderer = new Renderer(tmpDiv, Renderer.Backends.SVG);
+    tmpRenderer.resize(8000, STAVE_HEIGHT + TOP_MARGIN + 20);
+    const tmpCtx = tmpRenderer.getContext();
+
+    for (let mi = 0; mi < measures.length; mi++) {
+      const measure = measures[mi];
+      const measTickLen = measureTickLengths[mi];
+      const [beats, beatVal] = measure.timeSignature;
+
+      // Create a temp stave with generous width so VexFlow doesn't clip
+      const tmpStave = new Stave(0, TOP_MARGIN, 4000);
+      if (mi === 0) {
+        tmpStave.addClef('percussion');
+        tmpStave.addTimeSignature(`${beats}/${beatVal}`);
+      }
+      tmpStave.setContext(tmpCtx).draw();
+
+      if (mi === 0) {
+        clefTimeSigWidth = tmpStave.getNoteStartX();
+      }
+
+      // Build the same voices we'd build in the real pass
+      const { up: upMap, down: downMap } = partitionNotes(measure.notes);
+      const upTicks = [...upMap.keys()].sort((a, b) => a - b);
+      const downTicks = [...downMap.keys()].sort((a, b) => a - b);
+      const upEvents = spellVoiceRhythm(upTicks, measTickLen);
+      const downEvents = spellVoiceRhythm(downTicks, measTickLen);
+      const upIsEmpty = upTicks.length === 0;
+      const downIsEmpty = downTicks.length === 0;
+
+      const upVoiceNotes = buildVoiceFromRhythm(upEvents, upMap, 'up', upIsEmpty);
+      const downVoiceNotes = buildVoiceFromRhythm(downEvents, downMap, 'down', downIsEmpty);
+
+      const upVoice = new Voice({ numBeats: beats, beatValue: beatVal })
+        .setMode(Voice.Mode.SOFT)
+        .addTickables(upVoiceNotes);
+      const downVoice = new Voice({ numBeats: beats, beatValue: beatVal })
+        .setMode(Voice.Mode.SOFT)
+        .addTickables(downVoiceNotes);
+
+      const fmt = new Formatter();
+      fmt.joinVoices([upVoice]).joinVoices([downVoice]);
+      const minWidth = fmt.preCalculateMinTotalWidth([upVoice, downVoice]);
+
+      // The stave needs: left padding + minWidth + right padding
+      // For measure 0, the clef/timeSig overhead is handled separately
+      // (we shift the stave left), so the note area is the full baseWidth.
+      const padding = Stave.defaultPadding + 10; // extra safety margin
+      const neededNoteArea = minWidth + padding;
+
+      // For measure 0 the note area = baseWidths[0] (because we shift stave left)
+      // For other measures the note area ≈ baseWidths[mi] - small_stave_left_padding
+      if (neededNoteArea > baseWidths[mi]) {
+        computedWidths[mi] = neededNoteArea;
+      }
+    }
+
+    document.body.removeChild(tmpDiv);
+  }
+
   const totalWidth = Math.max(
     containerWidth,
     STAFF_TIMELINE_LEFT + computedWidths.reduce((sum, w) => sum + w, 0) + STAFF_RIGHT_PADDING
@@ -195,7 +271,12 @@ export function renderScore(
     const measure = measures[mi];
     const staveWidth = computedWidths[mi];
 
-    const stave = new Stave(currentX, TOP_MARGIN, staveWidth);
+    // For measure 0, shift the stave left by clefTimeSigWidth so the
+    // clef/time-sig sit over the label area and notes start at currentX.
+    const staveX = mi === 0 ? currentX - clefTimeSigWidth : currentX;
+    const staveW = mi === 0 ? staveWidth + clefTimeSigWidth : staveWidth;
+
+    const stave = new Stave(staveX, TOP_MARGIN, staveW);
 
     if (mi === 0) {
       stave.addClef('percussion');
@@ -252,7 +333,7 @@ export function renderScore(
       .setMode(Voice.Mode.SOFT)
       .addTickables(downVoiceNotes);
 
-    const noteAreaWidth = Math.max(20, stave.getNoteEndX() - stave.getNoteStartX() - 30);
+    const noteAreaWidth = Math.max(20, stave.getNoteEndX() - stave.getNoteStartX() - Stave.defaultPadding);
     new Formatter()
       .joinVoices([upVoice])
       .joinVoices([downVoice])
@@ -326,12 +407,11 @@ export function renderScore(
     currentX += staveWidth;
   }
 
+  // tickToX maps absolute ticks to absolute pixel positions
+  // using the actual per-measure widths (which may be expanded).
   const tickToX = (absoluteTick: number): number => {
     for (const sp of staveXPositions) {
-      if (
-        absoluteTick >= sp.tickStart &&
-        absoluteTick <= sp.tickStart + sp.ticksInMeasure
-      ) {
+      if (absoluteTick >= sp.tickStart && absoluteTick <= sp.tickStart + sp.ticksInMeasure) {
         const fraction = (absoluteTick - sp.tickStart) / sp.ticksInMeasure;
         return sp.startX + fraction * sp.width;
       }
@@ -341,7 +421,7 @@ export function renderScore(
       const fraction = (absoluteTick - last.tickStart) / last.ticksInMeasure;
       return last.startX + fraction * last.width;
     }
-    return 0;
+    return STAFF_TIMELINE_LEFT;
   };
 
   return {
@@ -349,5 +429,6 @@ export function renderScore(
     staveYTop: TOP_MARGIN,
     staveYBottom: TOP_MARGIN + STAVE_HEIGHT,
     tickToX,
+    measureWidths: computedWidths,
   };
 }

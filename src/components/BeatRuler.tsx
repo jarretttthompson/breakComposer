@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useScoreStore } from '../store/scoreStore';
 import { useViewStore } from '../store/viewStore';
 import { ticksPerMeasure } from '../utils/tick';
+import { buildMeasureLayouts, tickToXFromLayouts } from '../utils/layout';
 
 const RULER_HEIGHT = 24;
 const LABEL_WIDTH = 72;
@@ -16,6 +17,7 @@ export function BeatRuler() {
   const zoom = useViewStore((s) => s.zoom);
   const setScrollX = useViewStore((s) => s.setScrollX);
   const adjustZoom = useViewStore((s) => s.adjustZoom);
+  const measureWidths = useViewStore((s) => s.measureWidths);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -56,6 +58,18 @@ export function BeatRuler() {
     const thirtySecondTick = ppq / 8;
     let measureStartTick = 0;
 
+    // Build per-measure layouts for tick-to-pixel mapping
+    const hasLayouts = measureWidths.length > 0 && measureWidths.length === measures.length;
+    const layouts = hasLayouts ? buildMeasureLayouts(measures, measureWidths, ppq) : null;
+    const tx = (absTick: number) => {
+      if (layouts) {
+        const absX = tickToXFromLayouts(absTick, layouts);
+        const scrollPx = tickToXFromLayouts(scrollX, layouts) - LABEL_WIDTH;
+        return absX - scrollPx;
+      }
+      return LABEL_WIDTH + (absTick - scrollX) * zoom;
+    };
+
     for (let mi = 0; mi < measures.length; mi++) {
       const measure = measures[mi];
       const measTicks = ticksPerMeasure(measure.timeSignature, ppq);
@@ -64,8 +78,8 @@ export function BeatRuler() {
       const subsPerBeat = Math.round(ticksPerBeat / thirtySecondTick);
       const halfBeat = Math.floor(subsPerBeat / 2);
 
-      const measStartX = LABEL_WIDTH + (measureStartTick - scrollX) * zoom;
-      const measEndX = LABEL_WIDTH + (measureStartTick + measTicks - scrollX) * zoom;
+      const measStartX = tx(measureStartTick);
+      const measEndX = tx(measureStartTick + measTicks);
 
       if (measEndX < LABEL_WIDTH || measStartX > rect.width) {
         measureStartTick += measTicks;
@@ -74,7 +88,7 @@ export function BeatRuler() {
 
       for (let beat = 0; beat < beats; beat++) {
         const beatTick = measureStartTick + beat * ticksPerBeat;
-        const beatX = LABEL_WIDTH + (beatTick - scrollX) * zoom;
+        const beatX = tx(beatTick);
 
         if (beatX >= LABEL_WIDTH - 20 && beatX <= rect.width + 20) {
           const isBeat0 = beat === 0;
@@ -95,7 +109,7 @@ export function BeatRuler() {
 
         for (let sub = 1; sub < subsPerBeat; sub++) {
           const subTick = beatTick + sub * thirtySecondTick;
-          const x = LABEL_WIDTH + (subTick - scrollX) * zoom;
+          const x = tx(subTick);
           if (x < LABEL_WIDTH || x > rect.width) continue;
 
           if (sub === halfBeat) {
@@ -125,7 +139,7 @@ export function BeatRuler() {
     ctx.moveTo(0, RULER_HEIGHT - 0.5);
     ctx.lineTo(rect.width, RULER_HEIGHT - 0.5);
     ctx.stroke();
-  }, [score, scrollX, zoom]);
+  }, [score, scrollX, zoom, measureWidths]);
 
   useEffect(() => {
     let frameId = requestAnimationFrame(function loop() {

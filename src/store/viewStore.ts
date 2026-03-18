@@ -26,6 +26,7 @@ interface ViewState {
 
   selection: SelectionRect | null;
   clipboard: ClipboardEntry[];
+  measureWidths: number[];
 
   setScrollX: (x: number) => void;
   setZoom: (z: number) => void;
@@ -35,6 +36,7 @@ interface ViewState {
   adjustZoom: (delta: number) => void;
   setSelection: (sel: SelectionRect | null) => void;
   setClipboard: (entries: ClipboardEntry[]) => void;
+  setMeasureWidths: (widths: number[]) => void;
   toggleLooping: () => void;
 }
 
@@ -50,6 +52,7 @@ export const useViewStore = create<ViewState>((set) => ({
   looping: false,
   selection: null,
   clipboard: [],
+  measureWidths: [],
 
   setScrollX: (x) => set({ scrollX: Math.max(0, x) }),
   setZoom: (z) => set({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) }),
@@ -60,5 +63,6 @@ export const useViewStore = create<ViewState>((set) => ({
     set((s) => ({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, s.zoom + delta)) })),
   setSelection: (sel) => set({ selection: sel }),
   setClipboard: (entries) => set({ clipboard: entries }),
+  setMeasureWidths: (widths) => set({ measureWidths: widths }),
   toggleLooping: () => set((s) => ({ looping: !s.looping })),
 }));
